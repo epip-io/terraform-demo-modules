@@ -1,25 +1,20 @@
 provider "aws" {
-  region = var.aws_region
+  region = var.region
 }
 
 locals {
-  subject_alternative_names = [
-    var.name,
-    format("*.%s", var.name)
-  ]
+  subject_alternative_names = distinct(
+    concat(
+      var.subject_alternative_names,
+      formatlist("*.%s", [var.domain_name])
+    )
+  )
 }
 
-module "aws_acm" {
-  source  = "terraform-aws-modules/acm/aws"
-  version = "~> 2.5"
-
-  domain_name = var.name
-
-  zone_id = var.zone_id
-
+module "acm_request_certificate" {
+  source                    = "git::https://github.com/cloudposse/terraform-aws-acm-request-certificate.git?ref=tags/0.4.0"
+  domain_name               = var.domain_name
+  ttl                       = 300
   subject_alternative_names = local.subject_alternative_names
-
-  tags = {
-    Name = var.name
-  }
+  tags                      = var.tags
 }

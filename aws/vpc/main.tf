@@ -1,65 +1,37 @@
-
 provider "aws" {
-  region = var.aws_region
+  region = var.region
 }
+
+data "aws_availability_zones" "available" {}
 
 locals {
-  num_azs = length(var.azs)
-
-  azs = [
-    for az in var.azs : format("%s%s", var.aws_region, az)
-  ]
-
-  bits = local.num_azs > 3 ? 4 : 2
-
-  public_subnets = [
-    for i in range(local.num_azs) : "${cidrsubnet(
-      cidrsubnet(var.cidr, local.bits, local.num_azs),
-      local.bits, i
-    )}"
-  ]
-  private_subnets = [
-    for i in range(local.num_azs) : "${cidrsubnet(var.cidr, local.bits, i)}"
-  ]
+  availability_zones = slice(data.aws_availability_zones.available.names, 0, 2)
 }
 
-module "aws_vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 2.21"
+module "vpc" {
+  source     = "git::https://github.com/cloudposse/terraform-aws-vpc.git?ref=tags/0.8.1"
+  namespace  = var.namespace
+  stage      = var.stage
+  name       = var.name
+  delimiter  = var.delimiter
+  attributes = var.attributes
+  cidr_block = var.cidr_block
+  tags       = var.tags
+}
 
-  name = var.name
-
-  cidr             = var.cidr
-  instance_tenancy = var.tenancy
-
-  azs             = local.azs
-  public_subnets  = local.public_subnets
-  private_subnets = local.private_subnets
-
-  map_public_ip_on_launch = false
-
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  enable_nat_gateway = false
-
-  enable_s3_endpoint                   = true
-  enable_dynamodb_endpoint             = true
-  enable_secretsmanager_endpoint       = true
-  enable_ssm_endpoint                  = true
-  enable_ssmmessages_endpoint          = true
-  enable_ec2_endpoint                  = true
-  enable_ec2messages_endpoint          = true
-  enable_ecr_api_endpoint              = true
-  enable_ecr_dkr_endpoint              = true
-  enable_ecs_endpoint                  = true
-  enable_ecs_agent_endpoint            = true
-  enable_ecs_telemetry_endpoint        = true
-  enable_monitoring_endpoint           = true
-  enable_logs_endpoint                 = true
-  enable_events_endpoint               = true
-  enable_elasticloadbalancing_endpoint = true
-  enable_sts_endpoint                  = true
-
-  public_subnet_suffix = "utility"
+module "subnets" {
+  source               = "git::https://github.com/cloudposse/terraform-aws-dynamic-subnets.git?ref=tags/0.16.1"
+  availability_zones   = local.availability_zones
+  namespace            = var.namespace
+  stage                = var.stage
+  name                 = var.name
+  attributes           = var.attributes
+  delimiter            = var.delimiter
+  vpc_id               = module.vpc.vpc_id
+  igw_id               = module.vpc.igw_id
+  cidr_block           = module.vpc.vpc_cidr_block
+  nat_gateway_enabled  = false
+  nat_instance_enabled = true
+  nat_instance_type    = "t2.micro"
+  tags                 = var.tags
 }

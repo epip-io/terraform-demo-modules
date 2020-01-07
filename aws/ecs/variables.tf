@@ -51,14 +51,54 @@ variable "region" {
   description = "AWS Region the S3 bucket should reside in"
 }
 
-variable "subject_alternative_names" {
-  type        = list(string)
-  description = "A list of domains that should be SANs in the issued certificate"
-  default     = []
+variable "vpc_id" {
+  type        = string
+  description = "VPC ID to associate with ECS"
 }
 
-variable "domain_name" {
+variable "subnet_ids" {
+  type        = list(string)
+  description = "A list of subnet IDs to associate with ECS"
+}
+
+variable "instance_type" {
   type        = string
-  description = "Domain name (E.g. staging.cloudposse.co)"
-  default     = ""
+  description = "Instance type to use for ECS cluster"
+  default     = "t2.micro"
+}
+
+variable "root_block_device_type" {
+  type        = string
+  description = "root block device type"
+  default     = "gp2"
+}
+
+variable "root_block_device_size" {
+  type        = number
+  description = "root block device size"
+  default     = 10
+}
+
+variable "health_check_grace_period" {
+  type    = number
+  default = 600
+}
+
+variable "min_size" {
+  type    = number
+  default = 0
+}
+
+variable "max_size" {
+  type    = number
+  default = 1
+}
+
+variable "desired_capacity" {
+  type    = number
+  default = 1
+}
+
+variable "security_group_ids" {
+  type = list(string)
 }

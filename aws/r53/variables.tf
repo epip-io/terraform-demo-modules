@@ -51,14 +51,12 @@ variable "region" {
   description = "AWS Region the S3 bucket should reside in"
 }
 
-variable "subject_alternative_names" {
-  type        = list(string)
-  description = "A list of domains that should be SANs in the issued certificate"
-  default     = []
+variable "parent_zone_name" {
+  type        = string
+  description = "Parent Zone Name"
 }
 
-variable "domain_name" {
-  type        = string
-  description = "Domain name (E.g. staging.cloudposse.co)"
-  default     = ""
+variable "zone_name" {
+  description = "Zone name template"
+  default     = "$$${region}-$$${name}.$$${parent_zone_name}"
 }

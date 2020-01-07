@@ -51,14 +51,8 @@ variable "region" {
   description = "AWS Region the S3 bucket should reside in"
 }
 
-variable "subject_alternative_names" {
-  type        = list(string)
-  description = "A list of domains that should be SANs in the issued certificate"
-  default     = []
-}
-
-variable "domain_name" {
-  type        = string
-  description = "Domain name (E.g. staging.cloudposse.co)"
-  default     = ""
+variable "force_destroy" {
+  type        = bool
+  description = "A boolean that indicates the S3 bucket can be destroyed even if it contains objects. These objects are not recoverable"
+  default     = false
 }

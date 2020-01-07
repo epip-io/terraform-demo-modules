@@ -35,63 +35,92 @@ resource "aws_ssm_parameter" "secrets" {
   type  = "SecureString"
 }
 
-module "app" {
-  source = "git::https://github.com/cloudposse/terraform-aws-ecs-web-app.git?ref=tags/0.24.0"
-
+module "default_label" {
+  source     = "git::https://github.com/cloudposse/terraform-null-label.git?ref=tags/0.16.0"
+  name       = var.name
   namespace  = var.namespace
   stage      = var.stage
-  name       = var.name
-  attributes = compact(concat(var.attributes, ["app"]))
+  delimiter  = var.delimiter
+  attributes = var.attributes
+  tags       = var.tags
+}
+resource "aws_cloudwatch_log_group" "app" {
+  name = module.default_label.id
+  tags = module.default_label.tags
+}
 
-  region      = var.region
-  launch_type = "EC2"
-  vpc_id      = var.vpc_id
+module "alb_ingress" {
+  source                       = "git::https://github.com/cloudposse/terraform-aws-alb-ingress.git?ref=tags/0.9.0"
+  name                         = var.name
+  namespace                    = var.namespace
+  stage                        = var.stage
+  attributes                   = var.attributes
+  vpc_id                       = var.vpc_id
+  port                         = var.container_port
+  health_check_path            = var.health_check_path
+  default_target_group_enabled = true
+  target_type                  = var.target_type
 
-  desired_count = 1
+  unauthenticated_hosts = var.unauthenticated_hosts
 
-  container_image  = var.container_image
-  container_cpu    = var.container_cpu
-  container_memory = var.container_memory
-  container_port   = var.container_port
-  port_mappings = [{
-    containerPort = var.container_port
-    hostPort      = var.container_port
-    protocol      = "tcp"
+  unauthenticated_priority = var.unauthenticated_priority
+
+  unauthenticated_listener_arns       = var.unauthenticated_listener_arns
+  unauthenticated_listener_arns_count = length(var.unauthenticated_listener_arns)
+}
+
+module "container_definition" {
+  source                       = "git::https://github.com/cloudposse/terraform-aws-ecs-container-definition.git?ref=tags/0.21.0"
+  container_name               = module.default_label.id
+  container_image              = var.container_image
+  container_memory             = var.container_memory
+  container_memory_reservation = var.container_memory_reservation
+  container_cpu                = var.container_cpu
+  healthcheck                  = var.healthcheck
+  environment                  = var.container_environment
+  port_mappings                = var.port_mappings
+  secrets                      = local.secrets
+
+  log_configuration = {
+    logDriver = "awslogs"
+    options = {
+      "awslogs-region"        = var.region
+      "awslogs-group"         = aws_cloudwatch_log_group.app.name
+      "awslogs-stream-prefix" = var.name
+    }
+    secretOptions = null
+  }
+}
+
+module "ecs_alb_service_task" {
+  source                            = "git::https://github.com/cloudposse/terraform-aws-ecs-alb-service-task.git?ref=tags/0.17.0"
+  name                              = var.name
+  namespace                         = var.namespace
+  stage                             = var.stage
+  attributes                        = var.attributes
+  alb_security_group                = var.alb_security_group
+  container_definition_json         = module.container_definition.json
+  desired_count                     = var.desired_count
+  health_check_grace_period_seconds = var.health_check_grace_period_seconds
+  task_cpu                          = var.container_cpu
+  task_memory                       = var.container_memory
+  ecs_cluster_arn                   = var.ecs_cluster_arn
+  launch_type                       = var.launch_type
+  vpc_id                            = var.vpc_id
+  security_group_ids                = var.security_group_ids
+  subnet_ids                        = var.subnet_ids
+  container_port                    = var.container_port
+  tags                              = var.tags
+  ignore_changes_task_definition    = var.ignore_changes_task_definition
+  network_mode                      = var.network_mode
+
+  ecs_load_balancers = [
+    {
+      container_name   = module.default_label.id
+      container_port   = var.container_port
+      elb_name         = null
+      target_group_arn = module.alb_ingress.target_group_arn
   }]
-
-  environment = var.container_environment
-  secrets     = local.secrets
-
-  aws_logs_region        = var.region
-  ecs_cluster_arn        = var.ecs_arn
-  ecs_cluster_name       = var.ecs_name
-  ecs_security_group_ids = var.ecs_security_group_ids
-  ecs_private_subnet_ids = var.subnet_ids
-  ecs_alarms_enabled     = false
-
-  alb_security_group              = var.alb_security_group
-  alb_arn_suffix                  = var.alb_arn_suffix
-  alb_ingress_healthcheck_path    = "/"
-  alb_target_group_alarms_enabled = false
-
-  # Without authentication, both HTTP and HTTPS endpoints are supported
-  alb_ingress_unauthenticated_listener_arns       = var.alb_ingress_unauthenticated_listener_arns
-  alb_ingress_unauthenticated_listener_arns_count = length(var.alb_ingress_unauthenticated_listener_arns)
-
-  # All paths are unauthenticated
-  alb_ingress_unauthenticated_hosts             = var.alb_ingress_unauthenticated_hosts
-  alb_ingress_listener_unauthenticated_priority = var.alb_ingress_listener_unauthenticated_priority
-
-  alb_target_group_alarms_alarm_actions             = [""]
-  alb_target_group_alarms_ok_actions                = [""]
-  alb_target_group_alarms_insufficient_data_actions = [""]
-
-  repo_owner = var.repo_owner
-  repo_name  = var.repo_name
-
-  github_webhooks_token = var.github_token
-
-  codepipeline_enabled = false
 }
 
 data "aws_iam_policy_document" "ecs_task_access_secrets" {
@@ -113,9 +142,9 @@ data "aws_iam_policy_document" "ecs_task_access_secrets" {
 resource "aws_iam_role_policy" "ecs_task_access_secrets" {
   count = length(var.container_secrets) > 0 ? 1 : 0
 
-  name = "ECSTaskAccessSecretsPolicy"
+  name = "${module.default_label.id}-secrets"
 
-  role = module.app.ecs_task_exec_role_name
+  role = module.ecs_alb_service_task.task_exec_role_name
 
   policy = element(
     compact(

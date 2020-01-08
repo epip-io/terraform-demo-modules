@@ -57,7 +57,10 @@ module "alb_ingress" {
   attributes                   = var.attributes
   vpc_id                       = var.vpc_id
   port                         = var.container_port
+  health_check_enabled         = var.health_check_enabled
+  health_check_port            = var.health_check_port
   health_check_path            = var.health_check_path
+  health_check_matcher         = var.health_check_matcher
   default_target_group_enabled = true
   target_type                  = var.target_type
 
@@ -80,6 +83,8 @@ module "container_definition" {
   environment                  = var.container_environment
   port_mappings                = var.port_mappings
   secrets                      = local.secrets
+  command                      = var.command
+  entrypoint                   = var.entrypoint
 
   log_configuration = {
     logDriver = "awslogs"

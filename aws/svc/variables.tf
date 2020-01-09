@@ -629,3 +629,9 @@ variable "alb_zone_id" {
 variable "alb_dns_name" {
   type = string
 }
+
+variable "task_role_policy_arns" {
+  type        = list(string)
+  description = "ARNs of additional policies to add to the task role"
+  default     = []
+}

@@ -6,5 +6,5 @@ terraform {
   }
 
   # This gets filled in by Terragrunt
-  backend "local" {}
+  backend "s3" {}
 }

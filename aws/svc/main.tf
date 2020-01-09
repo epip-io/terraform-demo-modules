@@ -144,12 +144,10 @@ data "aws_iam_policy_document" "ecs_task_access_secrets" {
   }
 }
 
-resource "aws_iam_role_policy" "ecs_task_access_secrets" {
+resource "aws_iam_policy" "ecs_task_access_secrets" {
   count = length(var.container_secrets) > 0 ? 1 : 0
 
   name = "${module.default_label.id}-secrets"
-
-  role = module.ecs_alb_service_task.task_exec_role_name
 
   policy = element(
     compact(
@@ -157,6 +155,21 @@ resource "aws_iam_role_policy" "ecs_task_access_secrets" {
     ),
     0,
   )
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_access_secrets" {
+  count = length(var.container_secrets) > 0 ? 1 : 0
+
+  role       = module.ecs_alb_service_task.task_exec_role_name
+  policy_arn = aws_iam_policy.ecs_task_access_secrets[0].arn
+}
+
+resource "aws_iam_role_policy_attachment" "task_role_policies" {
+  for_each = toset(var.task_role_policy_arns)
+
+  role       = module.ecs_alb_service_task.task_role_name
+  policy_arn = each.value
+
 }
 
 resource "aws_route53_record" "this" {

@@ -78,3 +78,9 @@ variable "events" {
   type        = list(string)
   description = "A list of events which should trigger the webhook."
 }
+
+variable "active" {
+  type        = bool
+  description = "Activate the webhook"
+  default     = false
+}

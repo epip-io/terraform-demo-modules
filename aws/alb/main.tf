@@ -14,7 +14,7 @@ module "alb" {
   subnet_ids                              = var.subnet_ids
   internal                                = false
   http_enabled                            = true
-  https_enabled                           = true
+  https_enabled                           = var.https_enabled
   certificate_arn                         = var.certificate_arn
   alb_access_logs_s3_bucket_force_destroy = true
   access_logs_enabled                     = false

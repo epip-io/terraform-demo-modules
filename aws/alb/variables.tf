@@ -77,3 +77,8 @@ variable "target_group_name" {
   type    = string
   default = ""
 }
+
+variable "https_enabled" {
+  type    = bool
+  default = false
+}
